@@ -1,0 +1,9 @@
+latency_ms,flow_port,tx_packets,rx_packets,packet_loss_percent,throughput_mbps,mean_delay_ms,inference
+2,5000,,,,,,
+2,6000,,,,,,
+5,5000,,,,,,
+5,6000,,,,,,
+10,5000,,,,,,
+10,6000,,,,,,
+20,5000,,,,,,
+20,6000,,,,,,

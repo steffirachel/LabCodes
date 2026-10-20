@@ -1,0 +1,4 @@
+tcp_variant,bottleneck_mbps,flow_port,tx_packets,rx_packets,packet_loss_percent,throughput_mbps,mean_delay_ms,jain_fairness_index,cwnd_csv,notes
+Reno,2,,,,,,,,,
+Cubic,2,,,,,,,,,
+BBR_if_available,2,,,,,,,,,

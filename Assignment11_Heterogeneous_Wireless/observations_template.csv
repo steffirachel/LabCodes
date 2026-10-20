@@ -1,0 +1,4 @@
+speed_mps,mobile_node,tx_packets,rx_packets,packet_loss_percent,throughput_mbps,mean_delay_ms,estimated_rx_power_dbm,notes
+1,,,,,,,,
+5,,,,,,,,
+10,,,,,,,,

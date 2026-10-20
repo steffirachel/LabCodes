@@ -1,149 +1,123 @@
-# Simple Computer Networks Lab Codes (Ubuntu)
+# PCN NS-3 Assignments 7, 8, 9 and 11
 
-These are short beginner-style C socket programs, organized by lab exercise.
-Run them inside Ubuntu or WSL, not in Windows PowerShell.
+This package contains four assignment folders, one C++ NS-3 program per folder, detailed instructions, run scripts, and observation-table templates.
 
-## 1. Install compiler
+## 1. Enter the NS-3 folder
+
+```bash
+cd ~/ns-3
+```
+
+The folder name might differ on another computer. If this path does not exist, locate the directory that contains the `ns3` script. For example:
+
+```bash
+ls
+find ~ -maxdepth 3 -name ns3 -type f 2>/dev/null
+```
+
+Use `cd` with the directory that contains the `ns3` script.
+
+## 2. Configure NS-3
+
+```bash
+./ns3 configure --enable-examples
+```
+
+This configures the NS-3 build and enables example programs.
+
+## 3. Build NS-3
+
+```bash
+./ns3 build
+```
+
+Wait for the build to finish. If it reports an error, read the first compiler error; do not continue to run the assignment until the build succeeds.
+
+## 4. Run an example
+
+```bash
+./ns3 run first
+```
+
+This checks that NS-3 can run its basic `first` example. If your NS-3 version does not have this example, use an example listed by:
+
+```bash
+./ns3 show targets | head -40
+```
+
+## 5. Copy this package's C++ files into your NS-3 folder
+
+Extract this ZIP. From the extracted package, copy each `.cc` file into the `scratch` directory of your NS-3 installation. Example commands (adjust the extracted path if needed):
+
+```bash
+cp ~/Downloads/PCN_Assignments_7_8_9_11/Assignment7_UDP/udpns3.cc ~/ns-3/scratch/
+cp ~/Downloads/PCN_Assignments_7_8_9_11/Assignment8_TCP_UDP/assign8.cc ~/ns-3/scratch/
+cp ~/Downloads/PCN_Assignments_7_8_9_11/Assignment9_TCP_Congestion/assign9.cc ~/ns-3/scratch/
+cp ~/Downloads/PCN_Assignments_7_8_9_11/Assignment11_Heterogeneous_Wireless/assign11.cc ~/ns-3/scratch/
+```
+
+If your NS-3 folder is not `~/ns-3`, replace that path with your actual folder. Create `scratch` if it is missing:
+
+```bash
+mkdir -p ~/ns-3/scratch
+```
+
+## 6. Run your own C++ program
+
+The cheat-sheet example is:
+
+```bash
+./ns3 run scratch/hello
+```
+
+For these programs, use the corresponding target name:
+
+```bash
+./ns3 run scratch/udpns3
+./ns3 run scratch/assign8
+./ns3 run scratch/assign9
+./ns3 run scratch/assign11
+```
+
+For programs that accept parameters, place them after `--`. Examples:
+
+```bash
+./ns3 run "scratch/udpns3 --delay=5ms --rateMbps=1"
+./ns3 run "scratch/assign8 --bottleneckRate=5Mbps --bottleneckDelay=10ms --queuePackets=50 --udpRateMbps=1"
+./ns3 run "scratch/assign9 --tcpType=ns3::TcpNewReno --bottleneckRate=2Mbps"
+./ns3 run "scratch/assign11 --speed=5"
+```
+
+Run commands from the NS-3 directory (the directory containing `./ns3`).
+
+## 7. Results and generated files
+
+The programs print summary statistics in the terminal. Depending on the assignment, they also create `.pcap`, `.xml`, or `.csv` files in the NS-3 run directory. Open PCAP files with Wireshark, for example:
+
+```bash
+wireshark udp-port-trace-*.pcap
+```
+
+If Wireshark is not installed:
+
 ```bash
 sudo apt update
-sudo apt install build-essential
+sudo apt install wireshark
 ```
 
-Go to the folder after extracting:
-```bash
-cd Networking_Lab_Codes
-```
+Use the CSV observation templates in each assignment folder to record results from your own runs. Do not copy made-up sample numbers into a lab record.
 
-## 2. Normal TCP
-Terminal 1:
-```bash
-cd 01_TCP
-gcc server.c -o server
-./server
-```
-Terminal 2, in the same folder:
-```bash
-gcc client.c -o client
-./client
-```
-Enter a message in the client.
+## Folder contents
 
-## 3. Normal UDP
-Use a different terminal and stop any other program using port 8080 first.
-Terminal 1:
-```bash
-cd 02_UDP
-gcc server.c -o server
-./server
-```
-Terminal 2:
-```bash
-cd 02_UDP
-gcc client.c -o client
-./client
-```
+- `Assignment7_UDP/`: UDP ports 5000 and 6000, link latency and throughput.
+- `Assignment8_TCP_UDP/`: TCP/UDP flows, routers, bottleneck rate, delay and queue size.
+- `Assignment9_TCP_Congestion/`: competing TCP flows, congestion-control variants, fairness and congestion-window trace.
+- `Assignment11_Heterogeneous_Wireless/`: Wi-Fi mobility experiment and estimated received signal power.
+- Each folder contains its own `README.md`, C++ source, `run_examples.sh`, and `observations_template.csv`.
 
-## 4. Multi-client CSV (TCP)
-Keep `students.csv` in the same folder as the server.
-Terminal 1:
-```bash
-cd 03_MultiClient_CSV
-gcc tcp_server.c -o tcp_server -pthread
-./tcp_server
-```
-Terminal 2:
-```bash
-cd 03_MultiClient_CSV
-gcc tcp_client.c -o tcp_client
-./tcp_client
-```
-Try roll numbers `101`, `102`, or `103`. Run multiple clients in separate terminals to test concurrent connections.
+## Scope and honesty notes
 
-## 5. CSV lookup (UDP)
-Terminal 1:
-```bash
-cd 03_MultiClient_CSV
-gcc udp_server.c -o udp_server
-./udp_server
-```
-Terminal 2:
-```bash
-cd 03_MultiClient_CSV
-gcc udp_client.c -o udp_client
-./udp_client
-```
-This uses UDP port 8081.
-
-## 6. DNS with timeout
-Terminal 1:
-```bash
-cd 04_DNS
-gcc tcp_server.c -o server
-./server
-```
-Terminal 2:
-```bash
-cd 04_DNS
-gcc tcp_client.c -o client
-./client
-```
-Try `google.com`, `yahoo.com`, an unknown name, or `timeout.test`.
-`timeout.test` waits five seconds on the server, while the client times out after three seconds. The client has a simple in-memory cache for successful lookups during that one run.
-This is a small local DNS simulation, not a real internet DNS client.
-
-## 7. Checksum
-Terminal 1:
-```bash
-cd 05_Checksum
-gcc server.c -o server
-./server
-```
-Terminal 2:
-```bash
-cd 05_Checksum
-gcc client.c -o client
-./client
-```
-Enter two numbers between 0 and 255. The client calculates an 8-bit one's-complement checksum and sends the two numbers plus checksum; the server checks whether the final folded sum is 255.
-
-## 8. CRC
-Terminal 1:
-```bash
-cd 06_CRC
-gcc crc_server.c -o server
-./server
-```
-Terminal 2:
-```bash
-cd 06_CRC
-gcc crc_client.c -o client
-./client
-```
-Enter one character, then choose `0` for no error or `1` to flip the first bit. Generator: `10011`. The client converts the character to 8-bit ASCII, adds the CRC remainder, and sends the frame. The server divides it and checks the remainder.
-
-## 9. HTTP request to Python web server
-Terminal 1:
-```bash
-cd 07_HTTP
-python3 -m http.server 8000
-```
-Terminal 2:
-```bash
-cd 07_HTTP
-gcc client.c -o client
-./client
-```
-Enter:
-```text
-http://localhost:8000/notes.txt
-```
-The response body is saved as `downloaded_file` in the current directory.
-Try `http://localhost:8000/index.html`, `http://localhost:8000/sample.pdf`, or `http://localhost:8000/image.jpg` too.
-The sample client is for a local Python server using `localhost`; it does not support HTTPS.
-
-## Notes
-- For TCP and UDP, server and client must use matching ports.
-- Run the server before the client.
-- Press `Ctrl+C` to stop a server that is waiting for connections.
-- TCP and UDP normal examples both use port 8080, so do not run both servers at the same time.
-- The CSV examples use `students.csv` from their own folder.
+- These are NS-3 simulations, not programs that compile with plain `g++` outside NS-3.
+- The supplied assignment 11 program models Wi-Fi only. A full Bluetooth and Zigbee simulation is not implemented by this source; stock NS-3 does not provide a complete Bluetooth stack, and Zigbee support depends on external modules/version. Do not claim that the source simulates all three technologies.
+- Assignment 9 checks whether the requested TCP TypeId exists in your installed NS-3. BBR availability depends on NS-3 version and modules. If unavailable, run Reno and Cubic and record that limitation.
+- This package has not been compiled against the user's specific NS-3 installation. NS-3 API differences may require small version-specific changes.

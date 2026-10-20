@@ -1,0 +1,7 @@
+bottleneck_mbps,bottleneck_delay_ms,queue_packets,udp_rate_mbps,flow,tx_packets,rx_packets,packet_loss_percent,throughput_mbps,mean_delay_ms,tcp_retransmission_rate,notes
+2,10,50,1,TCP,,,,,,,
+5,10,50,1,TCP,,,,,,,
+10,10,50,1,TCP,,,,,,,
+2,10,50,1,UDP,,,,,,,
+5,10,50,1,UDP,,,,,,,
+10,10,50,1,UDP,,,,,,,
