@@ -1,0 +1,928 @@
+# NS-3 Routing Protocol Comparison — Beginner-Friendly Explanation
+
+Don't worry if you don't know anything about this code yet. We'll start with what a network is, understand what your assignment is trying to do, and then go through your code section by section in simple language.
+
+## 1. First, what is this project about?
+
+Imagine you want to send a message from your computer to another computer. The message may have to pass through several routers before it reaches the destination.
+
+Source computer
+
+Sends packets
+
+Routers
+
+Choose where packets should go
+
+Destination computer
+
+Receives packets
+
+Your project uses NS-3, a program that lets us create a virtual network and observe how it behaves without needing real computers and routers.
+
+Your program compares three routing options:
+
+- RIP: Learns routes using routing information shared between routers.
+- AODV: Finds a route when a source needs one.
+- OSPF option in your code: Uses NS-3 Global Routing as an approximation. It is not a real OSPF implementation.
+
+It tests these routing options under three conditions:
+
+| Condition    | What happens?                                         |
+| ------------ | ----------------------------------------------------- |
+| `normal`     | Ordinary traffic is sent                              |
+| `congestion` | Extra traffic is added, potentially overloading links |
+| `failure`    | A network link is disconnected                        |
+
+That gives \\(3 \times 3 = 9\\) possible combinations.
+
+For example, your program can test RIP under normal conditions, RIP during congestion, RIP after a link failure, and the same three conditions for AODV and Global Routing.
+
+## 2. Learn these basic networking words first
+
+Node
+
+A computer or device in the simulated network. Your code creates source computers, routers, and destination computers.
+
+Router
+
+A device that forwards packets toward their destination. It uses a routing table to decide where to send them.
+
+Packet
+
+A small unit of data sent over a network. A large message may be divided into many packets.
+
+Routing table
+
+A list of routes a router can use to decide where to forward a packet.
+
+Link
+
+A connection between two devices. Your code uses CSMA links to connect nodes.
+
+Data rate
+
+How much data a link can carry per second. For example, `10 Mbps` means 10 megabits per second.
+
+### What is UDP?
+
+UDP stands for User Datagram Protocol. It sends packets without establishing a connection like TCP does.
+
+Your program uses UDP because it is useful for generating traffic and measuring packet delivery, loss, and delay.
+
+UDP does not itself guarantee that every packet arrives. That makes it useful for observing what happens when packets are lost.
+
+## 3. Understand the network created by your code
+
+Your code creates:
+
+- 2 source nodes
+- 3 routers
+- 2 destination nodes
+
+That is 7 nodes in total.
+
+Here is your actual topology in a simplified form:
+
+S0
+
+Source 0
+
+R0
+
+Router 0
+
+R1
+
+Router 1
+
+D0
+
+Destination 0
+
+R1 and R2 also have a direct connection
+
+S1
+
+Source 1
+
+R0
+
+Router 0
+
+R2
+
+Router 2
+
+D1
+
+Destination 1
+
+There is also a direct R1–R2 link, giving the routers another connection.
+
+The actual connections are:
+
+| Connection | Purpose                                   |
+| ---------- | ----------------------------------------- |
+| S0–R0      | Connects source 0 to router 0             |
+| S1–R0      | Connects source 1 to router 0             |
+| R0–R1      | Connects router 0 to router 1             |
+| R0–R2      | Connects router 0 to router 2             |
+| R1–D0      | Connects router 1 to destination 0        |
+| R2–D1      | Connects router 2 to destination 1        |
+| R1–R2      | Gives router 1 and router 2 a direct link |
+
+Notice that both sources connect to R0. Each destination connects to a different router, and the routers have more than one possible connection.
+
+This is useful when testing routing because the chosen route can affect the results.
+
+## 4. Now let's understand the code from the beginning
+
+### Part A: Importing the NS-3 libraries
+
+Your code starts with:
+
+```
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/csma-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/flow-monitor-module.h"
+#include "ns3/aodv-helper.h"
+#include <fstream>
+```
+
+Think of these as toolboxes. Each toolbox contains functions that help you do a particular task.
+
+| Code                    | Beginner-friendly meaning                        |
+| ----------------------- | ------------------------------------------------ |
+| `core-module.h`         | Controls simulation time and events              |
+| `network-module.h`      | Creates nodes, devices, and connections          |
+| `internet-module.h`     | Provides IP addresses and routing                |
+| `csma-module.h`         | Creates CSMA network links                       |
+| `applications-module.h` | Generates traffic and receives packets           |
+| `flow-monitor-module.h` | Measures network performance                     |
+| `aodv-helper.h`         | Helps configure AODV routing                     |
+| `fstream`               | Reads and writes files, including the CSV output |
+
+Your code also uses `RipHelper`, so the appropriate RIP helper header must be available in your NS-3 installation, usually `ns3/rip-helper.h`. Header availability can vary with the NS-3 version.
+
+### Part B: The namespace and log name
+
+```
+using namespace ns3;
+
+NS_LOG_COMPONENT_DEFINE("RoutingComparison");
+```
+
+- `using namespace ns3;` lets you write `NodeContainer` instead of `ns3::NodeContainer`.
+- `NS_LOG_COMPONENT_DEFINE(...)` defines a name for NS-3 logging messages. It does not itself print your results.
+
+### Part C: Variables
+
+```
+std::string pr = "rip", cd = "normal",
+            out = "routing_results.csv";
+
+uint16_t port = 5000;
+double tp = 0, ds = 0, tx = 0, rx = 0;
+double off, pdr, dly, tr, loss;
+int nf = 0;
+bool hdr;
+```
+
+Let's understand each one.
+
+| Variable | Meaning                                             |
+| -------- | --------------------------------------------------- |
+| `pr`     | Which routing protocol to use; starts with RIP      |
+| `cd`     | Which condition to test; starts with normal         |
+| `out`    | Name of the CSV file for results                    |
+| `port`   | Main UDP destination port, `5000`                   |
+| `tp`     | Adds up the calculated throughput of selected flows |
+| `ds`     | Adds up their total packet delay in seconds         |
+| `tx`     | Total transmitted packets                           |
+| `rx`     | Total received packets                              |
+| `off`    | Used in the transmission-ratio calculation          |
+| `pdr`    | Packet delivery ratio                               |
+| `dly`    | Average delay in milliseconds                       |
+| `tr`     | Transmission ratio                                  |
+| `loss`   | Packet-loss percentage                              |
+| `nf`     | Number of selected flows processed                  |
+| `hdr`    | Decides whether to write the CSV column headings    |
+
+`uint16_t` is an unsigned integer type often used for port numbers. `double` stores decimal numbers, and `bool` stores either `true` or `false`.
+
+Important: `off` is not initialized when declared. The program assigns it later, before using it in the final calculation.
+
+### Part D: Creating containers
+
+```
+NodeContainer src, r, dst;
+InternetStackHelper net;
+CsmaHelper csma;
+Ipv4AddressHelper addr;
+```
+
+A container is like a box that holds related objects.
+
+- `src` holds the source computers.
+- `r` holds the routers.
+- `dst` holds the destination computers.
+- `net` helps install networking functionality.
+- `csma` helps create connections.
+- `addr` helps assign IP addresses.
+
+The next declarations hold the connections and monitoring information:
+
+```
+Ipv4InterfaceContainer s0r0, s1r0, r0r1,
+    r0r2, r1r2, r1d0, r2d1;
+
+FlowMonitorHelper fm;
+Ptr<FlowMonitor> mon;
+Ptr<Ipv4FlowClassifier> cl;
+std::map<FlowId, FlowMonitor::FlowStats> st;
+Ipv4FlowClassifier::FiveTuple t5;
+```
+
+These names are not extra computers. They are variables for storing information about interfaces, monitored traffic, and flows.
+
+- `Ipv4InterfaceContainer` stores IP-interface information for a link.
+- `FlowMonitorHelper` sets up monitoring.
+- `mon` stores the monitor.
+- `cl` helps identify the flows.
+- `st` stores statistics for each flow.
+- `t5` stores the identifying information for one flow.
+
+A flow is a stream of packets sharing identifying information such as source IP, destination IP, ports, and protocol.
+
+## 5. Choosing the routing protocol
+
+Your code uses:
+
+```
+CommandLine cmd(__FILE__);
+
+cmd.AddValue("protocol",
+    "Routing protocol (rip/ospf/aodv)", pr);
+
+cmd.AddValue("condition",
+    "Network condition (normal/congestion/failure)", cd);
+
+cmd.AddValue("out", "Output CSV file", out);
+
+cmd.Parse(argc, argv);
+```
+
+This allows you to choose the protocol, condition, and output filename when running the program.
+
+For example, the intended command-line options are:
+
+```
+./ns3 run "routing-comparison --protocol=aodv --condition=normal"
+```
+
+The actual run command depends on your program's filename and NS-3 build setup.
+
+If you don't supply any options, the defaults are:
+
+- Protocol: `rip`
+- Condition: `normal`
+- Output file: `routing_results.csv`
+
+Next, the code checks whether the protocol name is valid:
+
+```
+if (pr != "rip" && pr != "ospf" && pr != "aodv")
+{
+    std::cout << "Unknown protocol: " << pr << "\n";
+    return 1;
+}
+```
+
+In simple terms, if you type a protocol name other than those three, the program displays an error and stops.
+
+`return 1` indicates that the program ended with an error.
+
+## 6. Creating the seven nodes
+
+```
+src.Create(2);
+r.Create(3);
+dst.Create(2);
+```
+
+These three lines create the network devices' nodes.
+
+- `src.Create(2)` creates two source nodes.
+- `r.Create(3)` creates three routers.
+- `dst.Create(2)` creates two destination nodes.
+
+Total:
+
+\\[ 2+3+2=7\text{ nodes} \\]
+
+When the code later uses `src.Get(0)`, it means the first source node. `r.Get(1)` means the second router.
+
+## 7. Installing RIP, AODV, or Global Routing
+
+```
+if (pr == "rip")
+{
+    RipHelper rip;
+    net.SetRoutingHelper(rip);
+}
+else if (pr == "aodv")
+{
+    AodvHelper aodv;
+    net.SetRoutingHelper(aodv);
+}
+else
+{
+    Config::SetDefault(
+        "ns3::Ipv4GlobalRouting::RespondToInterfaceEvents",
+        BooleanValue(true));
+}
+```
+
+Read this as:
+
+- If `pr` is `"rip"`, configure RIP.
+- Otherwise, if `pr` is `"aodv"`, configure AODV.
+- Otherwise, the program takes the global-routing path and enables response to interface events.
+
+`BooleanValue(true)` turns that setting on.
+
+Then:
+
+```
+net.Install(src);
+net.Install(r);
+net.Install(dst);
+```
+
+This installs the Internet stack on all the source nodes, routers, and destination nodes.
+
+Why is this needed? Creating a node alone does not give it a fully configured IP network. The Internet stack provides the networking functionality.
+
+For the `ospf` option, your code later calls `Ipv4GlobalRoutingHelper::PopulateRoutingTables()`. This calculates and populates routes using NS-3 Global Routing; it does not implement real OSPF.
+
+## 8. Setting up the network links
+
+First, the code configures the properties of each connection:
+
+```
+csma.SetChannelAttribute(
+    "DataRate", StringValue("10Mbps"));
+
+csma.SetChannelAttribute(
+    "Delay", StringValue("2ms"));
+```
+
+This means each CSMA link has:
+
+- A data rate of 10 Mbps.
+- A channel delay of 2 milliseconds.
+
+Now comes a slightly unfamiliar part:
+
+```
+auto link = [&](Ptr<Node> a, Ptr<Node> b,
+                const char* sub)
+{
+    NodeContainer nc(a, b);
+    NetDeviceContainer d = csma.Install(nc);
+    addr.SetBase(sub, "255.255.255.0");
+    return addr.Assign(d);
+};
+```
+
+Don't worry about `auto` and `[&]` right now. This is a small reusable function written inside `main()`.
+
+It accepts three things:
+
+- `a`: the first node.
+- `b`: the second node.
+- `sub`: the subnet address to use for their connection.
+
+Inside the function:
+
+1. `NodeContainer nc(a, b);` groups the two nodes.
+2. `csma.Install(nc);` connects them.
+3. `addr.SetBase(...)` chooses their IP subnet.
+4. `addr.Assign(d)` assigns IP addresses to their network interfaces.
+5. `return` sends the resulting interface information back to the caller.
+
+Why create this function? Without it, you'd need to write the same four or five setup steps for every link.
+
+The function is called seven times:
+
+```
+s0r0 = link(src.Get(0), r.Get(0), "10.1.1.0");
+s1r0 = link(src.Get(1), r.Get(0), "10.1.2.0");
+r0r1 = link(r.Get(0), r.Get(1), "10.1.3.0");
+r0r2 = link(r.Get(0), r.Get(2), "10.1.4.0");
+r1d0 = link(r.Get(1), dst.Get(0), "10.1.5.0");
+r2d1 = link(r.Get(2), dst.Get(1), "10.1.6.0");
+r1r2 = link(r.Get(1), r.Get(2), "10.1.7.0");
+```
+
+Each call creates one connection and assigns it a different subnet.
+
+For example:
+
+```
+s0r0 = link(src.Get(0), r.Get(0), "10.1.1.0");
+```
+
+means:
+
+> Connect source 0 to router 0, and assign addresses from the `10.1.1.0/24` subnet.
+
+### What is an IP address?
+
+An IP address identifies a network interface so that packets can be sent to the correct device on the network.
+
+The subnet mask `255.255.255.0` is equivalent to `/24`. Each link has a different subnet so that the network interfaces can be identified correctly.
+
+## 9. Populating the routing tables
+
+```
+if (pr == "ospf")
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+```
+
+If you selected the `ospf` option, this line asks NS-3 to calculate and populate the global routing tables.
+
+Think of it like preparing directions before starting a journey.
+
+The routers need routes to know where packets should go. RIP and AODV learn or discover routes through their respective routing mechanisms; the global-routing option uses NS-3's global route calculation.
+
+Again, remember for your viva: this is not actual OSPF.
+
+## 10. Creating the receivers
+
+Your code contains:
+
+```
+for (uint16_t p = port; p <= port + 2; p++)
+{
+    PacketSinkHelper sk(
+        "ns3::UdpSocketFactory",
+        InetSocketAddress(Ipv4Address::GetAny(), p));
+
+    ApplicationContainer c = sk.Install(dst);
+    c.Start(Seconds(1.0));
+    c.Stop(Seconds(31.0));
+}
+```
+
+This loop creates UDP receiving applications.
+
+Let's break it down.
+
+### What does the loop do?
+
+`port` starts at `5000`.
+
+The loop runs three times:
+
+| Loop   | Port |
+| ------ | ---- |
+| First  | 5000 |
+| Second | 5001 |
+| Third  | 5002 |
+
+`PacketSinkHelper` creates an application that receives UDP packets.
+
+`Ipv4Address::GetAny()` means the application can listen on the local IPv4 interfaces rather than specifying one particular local IP address.
+
+`sk.Install(dst)` installs that receiver on both destination nodes.
+
+The receivers start at 1 second and stop at 31 seconds.
+
+Why start receivers before sending traffic? So that they are already listening when the source applications begin transmitting at 5 seconds.
+
+## 11. Creating the traffic source
+
+This is the next reusable function in your program:
+
+```
+auto cbr = [&](Ptr<Node> n, Address a,
+               const char* rt)
+{
+    OnOffHelper h("ns3::UdpSocketFactory", a);
+
+    h.SetAttribute("DataRate", StringValue(rt));
+    h.SetAttribute("PacketSize", UintegerValue(512));
+
+    h.SetAttribute("OnTime",
+        StringValue(
+        "ns3::ConstantRandomVariable[Constant=1]"));
+
+    h.SetAttribute("OffTime",
+        StringValue(
+        "ns3::ConstantRandomVariable[Constant=0]"));
+
+    ApplicationContainer c = h.Install(n);
+
+    c.Start(Seconds(5.0));
+    c.Stop(Seconds(30.0));
+};
+```
+
+This function creates a traffic generator.
+
+It accepts:
+
+- `n`: the source node.
+- `a`: the destination address and port.
+- `rt`: the sending data rate.
+
+### What is `OnOffHelper`?
+
+It creates an application that sends traffic during its ON periods and stops during its OFF periods.
+
+Your code sets:
+
+```
+h.SetAttribute("OnTime",
+    StringValue(
+    "ns3::ConstantRandomVariable[Constant=1]"));
+
+h.SetAttribute("OffTime",
+    StringValue(
+    "ns3::ConstantRandomVariable[Constant=0]"));
+```
+
+This means the application is configured to remain ON continuously and have no OFF time. So it behaves like a constant-rate traffic source while it is active.
+
+The packet size is 512 bytes, and the application runs from 5 to 30 seconds.
+
+### Starting the normal traffic
+
+```
+cbr(src.Get(0),
+    InetSocketAddress(r1d0.GetAddress(1), port),
+    "1Mbps");
+
+cbr(src.Get(1),
+    InetSocketAddress(r2d1.GetAddress(1), port),
+    "1Mbps");
+```
+
+The first source sends traffic to destination 0 at port 5000.
+
+The second source sends traffic to destination 1 at port 5000.
+
+Both sources are configured for 1 Mbps.
+
+## 12. How the congestion condition works
+
+```
+if (cd == "congestion")
+{
+    cbr(src.Get(0),
+        InetSocketAddress(r1d0.GetAddress(1), port + 1),
+        "9Mbps");
+
+    cbr(src.Get(1),
+        InetSocketAddress(r2d1.GetAddress(1), port + 2),
+        "9Mbps");
+}
+```
+
+If the condition is `congestion`, two additional traffic sources are created.
+
+| Source | Destination | Port | Rate   |
+| ------ | ----------- | ---- | ------ |
+| S0     | D0          | 5001 | 9 Mbps |
+| S1     | D1          | 5002 | 9 Mbps |
+
+The original 1 Mbps flows continue running.
+
+This creates much more offered traffic. If traffic exceeds the capacity available along a link, packets may queue up and be dropped, causing increased delay or packet loss.
+
+One detail to remember: the extra flows use ports 5001 and 5002, but your final metric loop only selects flows whose destination port is 5000. So the extra traffic can affect network performance, but its own packets are excluded from the printed flow-level metrics and the aggregate calculations that use the selected flows.
+
+## 13. How the link-failure condition works
+
+Your code attempts to schedule the failure as follows:
+
+```
+if (cd == "failure")
+{
+    Simulator::Schedule(
+        Seconds(10.0),
+        &Ipv4::SetDown,
+        r0r1.Get(0).first,
+        r0r1.Get(0).second);
+
+    Simulator::Schedule(
+        Seconds(10.0),
+        &Ipv4::SetDown,
+        r0r1.Get(1).first,
+        r0r1.Get(1).second);
+}
+```
+
+The intention is to bring down the IPv4 interfaces at both ends of the R0–R1 link at 10 seconds.
+
+`Simulator::Schedule()` means:
+
+> Run a particular function at a particular simulation time.
+
+`Seconds(10.0)` is the scheduled time, and `Ipv4::SetDown` is the operation the code intends to call.
+
+However, this part needs checking before the code is run. In standard NS-3 versions, `Ipv4InterfaceContainer::Get()` returns an interface address, not a pair containing an IPv4 object and interface index. Therefore, the `.first` and `.second` expressions shown here are not generally valid for that return type.
+
+Conceptually, the correct process is to obtain the `Ipv4` object and interface index for each end of the link, then schedule `SetDown()` on those interfaces. The exact code should be adjusted for your NS-3 version.
+
+Also note that the failure is scheduled at 10 seconds, but the global-routing option does not explicitly call `PopulateRoutingTables()` again in this section. Whether and how routes are updated depends on the configuration and interface-event behavior. This matters when interpreting your failure results.
+
+## 14. Monitoring the network
+
+```
+mon = fm.InstallAll();
+
+Simulator::Stop(Seconds(31.0));
+Simulator::Run();
+
+mon->CheckForLostPackets();
+
+cl = DynamicCast<Ipv4FlowClassifier>(
+    fm.GetClassifier());
+
+st = mon->GetFlowStats();
+```
+
+These lines measure what happened during the simulation.
+
+Let's understand them one by one:
+
+- `fm.InstallAll()` installs FlowMonitor on all nodes.
+- `Simulator::Stop(Seconds(31.0))` sets the simulation's end time.
+- `Simulator::Run()` starts the simulation.
+- `CheckForLostPackets()` checks for packets that were lost.
+- `GetClassifier()` gets the object that identifies each flow.
+- `GetFlowStats()` gets the collected statistics.
+
+Think of FlowMonitor as a teacher observing a network experiment and recording how many packets were sent, how many arrived, and how long they took.
+
+## 15. Printing the results for each flow
+
+```
+for (auto& s : st)
+{
+    t5 = cl->FindFlow(s.first);
+
+    if (t5.protocol != 17 ||
+        t5.destinationPort != port)
+        continue;
+```
+
+This loop goes through the recorded flows one by one.
+
+- `s.first` is the flow ID.
+- `FindFlow()` obtains the flow's identifying details.
+- `t5.protocol != 17` skips flows that are not UDP.
+- `t5.destinationPort != port` skips flows not going to port 5000.
+- `continue` means skip the current flow and move to the next one.
+
+So the program selects only UDP flows whose destination port is 5000.
+
+### A. Throughput
+
+```
+double ftp =
+    s.second.rxBytes * 8.0 / 25.0 / 1e6;
+```
+
+Here:
+
+- `rxBytes` is the number of bytes received.
+- Multiplying by 8 converts bytes into bits.
+- Dividing by 25 uses the time interval from 5 seconds to 30 seconds.
+- Dividing by `1e6` converts bits per second into megabits per second.
+
+The formula is:
+
+\\[ \text{Throughput} = \frac{\text{Received bytes}\times 8} {\text{Measurement time in seconds}\times 10^6} \\]
+
+For example, if 3,125,000 bytes arrive in 25 seconds:
+
+\\[ \frac{3,125,000\times8}{25\times10^6} =1\text{ Mbps} \\]
+
+This is the throughput formula used by your code.
+
+### B. Average delay
+
+```
+double fd =
+    s.second.rxPackets > 0
+    ? s.second.delaySum.GetSeconds()
+      / s.second.rxPackets * 1000.0
+    : 0;
+```
+
+This is a conditional expression.
+
+In simple words:
+
+- If packets were received, divide the total packet delay by the number received.
+- Multiply by 1000 to convert seconds into milliseconds.
+- If no packets were received, report zero to avoid division by zero.
+
+\\[ \text{Average delay} = \frac{\text{Total delay}}{\text{Received packets}} \\]
+
+### C. Packet Delivery Ratio
+
+```
+double fp =
+    s.second.txPackets > 0
+    ? (double)s.second.rxPackets
+      / s.second.txPackets * 100.0
+    : 0;
+```
+
+This calculates the percentage of transmitted packets that arrived.
+
+\\[ \text{PDR} = \frac{\text{Received packets}}{\text{Transmitted packets}} \times100 \\]
+
+For example, 800 received packets out of 1000 transmitted packets gives a PDR of 80%.
+
+### D. Adding totals
+
+```
+tp += ftp;
+tx += s.second.txPackets;
+rx += s.second.rxPackets;
+ds += s.second.delaySum.GetSeconds();
+```
+
+These lines add the current flow's values to the totals.
+
+- `tp`: adds throughput values.
+- `tx`: adds transmitted packets.
+- `rx`: adds received packets.
+- `ds`: adds total delay.
+
+Then the program prints the source address, destination address, throughput, average delay, PDR, transmitted packets, and received packets.
+
+## 16. Calculating the overall results
+
+After the loop, your code calculates the final metrics.
+
+### Packet loss
+
+```
+pdr = tx > 0 ? rx / tx * 100.0 : 0;
+loss = tx > 0 ? 100.0 - pdr : 0;
+```
+
+It first calculates the overall PDR and then subtracts it from 100%.
+
+For example:
+
+- PDR = 95%
+- Packet loss = 100 − 95 = 5%
+
+### Average end-to-end delay
+
+```
+dly = rx > 0 ? ds / rx * 1000.0 : 0;
+```
+
+This divides the total delay by the total received packets and converts the result to milliseconds.
+
+### Transmission ratio
+
+```
+off = nf * 1e6 * 25.0 / (512 * 8.0);
+tr = off > 0 ? tx / off * 100.0 : 0;
+```
+
+The intention appears to be calculating a transmission ratio. However, the formula has a problem: `nf` counts the number of selected flows, not the number of packets expected to be offered to the network. Therefore, this is not a valid calculation of the expected packet transmission ratio.
+
+If you are asked about this in a viva, explain what the code currently calculates, but do not claim that it correctly measures the transmission ratio.
+
+Also, `tp` is calculated by adding individual flow throughputs. That gives the sum of the measured throughputs of the selected flows, using the same 25-second measurement window.
+
+## 17. Saving the results to a CSV file
+
+```
+std::ifstream chk(out);
+
+hdr = chk.peek() ==
+      std::ifstream::traits_type::eof();
+
+chk.close();
+```
+
+The program opens the output file and checks whether it is empty.
+
+If the file is empty, it writes the column headings:
+
+```
+if (hdr)
+    o << "Protocol,Condition,ThroughputMbps,"
+         "PacketLossPercent,PDRPercent,"
+         "TransmissionRatioPercent,"
+         "EndToEndDelayMs,TxPackets,RxPackets\n";
+```
+
+Then it appends the results:
+
+```
+o << pr << "," << cd << "," << tp << ","
+  << loss << "," << pdr << "," << tr << ","
+  << dly << "," << tx << "," << rx << "\n";
+```
+
+A CSV file is a simple text file in which values are separated by commas. You can open `routing_results.csv` in Excel or another spreadsheet application.
+
+Each run appends one row. For a complete comparison, run the program with the nine protocol-condition combinations and use the same output file.
+
+## 18. What is the overall flow of your program?
+
+1
+
+Read the protocol and condition
+
+2
+
+Create 7 nodes
+
+3
+
+Install the routing configuration
+
+4
+
+Create 7 links and assign IP addresses
+
+5
+
+Install UDP receivers and traffic sources
+
+6
+
+Apply congestion or link failure if selected
+
+7
+
+Run the simulation for 31 seconds
+
+8
+
+Collect packet statistics
+
+9
+
+Calculate and print performance metrics
+
+10
+
+Save the results in a CSV file
+
+## 19. Important viva questions
+
+1\. What is the aim of this program?
+
+2\. What is NS-3?
+
+3\. How many nodes are created?
+
+4\. What is RIP?
+
+5\. What is AODV?
+
+6\. Does the program implement real OSPF?
+
+7\. What is congestion?
+
+8\. What happens during link failure?
+
+9\. Why use FlowMonitor?
+
+10\. What is throughput?
+
+11\. What is PDR?
+
+12\. What is end-to-end delay?
+
+13\. Why save a CSV file?
+
+14\. Why use UDP?
+
+15\. Why are there three ports?
+
+## 20. A simple explanation to memorize
+
+You can say this during your viva:
+
+> “My project uses NS-3 to compare RIP, AODV, and Global Routing, which is used as an approximation of OSPF. I create seven nodes: two sources, three routers, and two destinations. I connect them using seven CSMA links, each configured with a data rate of 10 Mbps and a delay of 2 milliseconds. I generate UDP traffic at 1 Mbps from both sources. In the congestion condition, I add extra traffic at 9 Mbps from each source. In the failure condition, I attempt to disable the link between router 0 and router 1 at 10 seconds. FlowMonitor collects packet statistics, and the program calculates throughput, packet loss, packet delivery ratio, and average end-to-end delay. Finally, the results are printed and saved to a CSV file.”
+
+Before your viva: fix or verify the link-failure code and transmission-ratio formula. Those are the two most important technical issues in the current version.
