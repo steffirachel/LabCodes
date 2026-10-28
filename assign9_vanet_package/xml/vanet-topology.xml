@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vanetSimulation name="TCP Congestion Control Comparison">
+  <description>
+    Conceptual topology for a simplified ITS/VANET-inspired experiment.
+    This XML documents the scenario; assn9.cc creates the simulation directly.
+  </description>
+  <simulation durationSeconds="20" />
+  <nodes>
+    <vehicle id="vehicle1" senderPort="5000" />
+    <vehicle id="vehicle2" senderPort="5001" />
+    <vehicle id="vehicle3" senderPort="5002" />
+    <vehicle id="vehicle4" senderPort="5003" />
+    <vehicle id="vehicle5" senderPort="5004" />
+    <router id="roadsideRouter" role="packet-forwarding" />
+    <server id="trafficServer" role="traffic-information-receiver" />
+  </nodes>
+  <links>
+    <link from="vehicle1" to="roadsideRouter" rate="10Mbps" delay="2ms" />
+    <link from="vehicle2" to="roadsideRouter" rate="10Mbps" delay="2ms" />
+    <link from="vehicle3" to="roadsideRouter" rate="10Mbps" delay="2ms" />
+    <link from="vehicle4" to="roadsideRouter" rate="10Mbps" delay="2ms" />
+    <link from="vehicle5" to="roadsideRouter" rate="10Mbps" delay="2ms" />
+    <link from="roadsideRouter" to="trafficServer"
+          rate="2Mbps" delay="20ms"
+          queueDiscipline="DropTail" queueLimitPackets="10" />
+  </links>
+  <tcpVariants>
+    <tcp name="NewReno" />
+    <tcp name="Cubic" />
+    <tcp name="Bbr" />
+  </tcpVariants>
+  <metrics>
+    <metric name="throughput" unit="Mbps" />
+    <metric name="averageDelay" unit="ms" />
+    <metric name="lostPackets" unit="packets" />
+    <metric name="jainFairnessIndex" range="0..1" />
+    <metric name="congestionWindow" unit="bytes" />
+  </metrics>
+</vanetSimulation>
