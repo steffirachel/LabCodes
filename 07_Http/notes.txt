@@ -1,0 +1,2 @@
+This is a sample file for HTTP download.
+Computer Networks Lab.
