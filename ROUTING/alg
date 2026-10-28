@@ -1,0 +1,13 @@
+Algorithm
+1. Start the NS-3 simulation and read the routing protocol, network condition, and output CSV filename.
+2. Create two source nodes, three router nodes, and two destination nodes.
+3. Install the selected routing protocol: RIP, AODV, or Global Routing.
+4. Connect the nodes using CSMA links and assign IP addresses.
+5. Install UDP packet sinks at the destination nodes.
+6. Generate UDP traffic from the source nodes at 1 Mbps.
+7. If congestion is selected, add extra UDP traffic at 9 Mbps.
+8. If failure is selected, schedule the Router 0–Router 1 link to be disabled at 10 seconds.
+9. Run the simulation for 31 seconds and collect statistics using FlowMonitor.
+10. Calculate throughput, packet loss, packet delivery ratio, transmission ratio, and end-to-end delay.
+11. Display the results and save them to a CSV file.
+12. Stop the simulation and end.
